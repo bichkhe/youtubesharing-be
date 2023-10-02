@@ -1,14 +1,19 @@
 import { Prisma, PrismaClient } from '@prisma/client'
 import express from 'express'
-import { comparePassword, generateToken, hashPassword } from './utils'
-import { time } from 'console'
-import * as EmailValidator from 'email-validator';
+import { comparePassword, generateToken, hashPassword, verifyToken } from './utils'
+import * as EmailValidator from 'email-validator'
+import cookieParser from 'cookie-parser'
+import dayjs from 'dayjs'
+import * as dotenv from "dotenv"
+import cors from 'cors'
+
 const prisma = new PrismaClient()
 const app = express()
-
+app.use(cors())
+app.use(cookieParser())
 app.use(express.json())
 
-import * as dotenv from "dotenv";
+
 dotenv.config();
 
 // --- User
@@ -21,7 +26,7 @@ app.post(`/api/register`, async (req, res) => {
   // Step 1: email format is valid or not
   const valid = EmailValidator.validate(email);
   if (!valid) {
-    return res.json({
+    return res.status(400).json({
       code: -101,
       error_message: 'email is not valid',
     })
@@ -50,6 +55,7 @@ app.post(`/api/register`, async (req, res) => {
 })
 
 app.post(`/api/login`, async (req, res) => {
+  console.log(req.cookies);
   const { email, password } = req.body
   const user = await prisma.user.findFirst({
     where: {
@@ -58,33 +64,88 @@ app.post(`/api/login`, async (req, res) => {
   })
   const valid = await comparePassword(password, user?.passwordHash as string);
   if (!valid) {
-    return res.json({
+    return res.status(400).json({
       code: -102,
       error_message: 'password and email have mismatch',
     })
   }
 
   // Generate claim token
-  const token = generateToken(email)
-
+  const date = new Date();
+  date.setHours(date.getHours() + 6);
+  const token = generateToken(email, "6h")
   // Response
   const result = await prisma.authUser.upsert({
     create: {
       email,
       createdAt: new Date(),
-      expiredAt: "",
+      expiredAt: dayjs(date).format('YYYY-MM-DD hh:mm'),
       sessionToken: token
     },
     update: {
       sessionToken: token,
       createdAt: new Date(),
-      expiredAt: "",
+      expiredAt: dayjs(date).format('YYYY-MM-DD hh:mm'),
     },
     where: { email: email }
   })
+
+  res.cookie('token', token, {
+    secure: true,
+    httpOnly: true,
+    expires: date,
+    sameSite: 'strict',
+  });
   res.json(result)
 })
 
+app.post('/api/logout', (req, res) => {
+  const authHeader = req.headers['authorization']
+  let token = ""
+  if (authHeader?.startsWith("Bearer")) {
+    token = authHeader?.substring("Bearer ".length)
+  }
+  console.log('jwt_token11:', token);
+  const claim = verifyToken(token)
+  console.log('jwt_token:', token, claim)
+  res.clearCookie('token');
+  res.json({
+    code: 0,
+    success_message: 'Logout successfully'
+  })
+});
+
+// -- Videos API
+app.get(`/api/videos`, async (req, res) => {
+  console.log(req.cookies);
+  const params = req.params
+  const videos = [
+    {
+      id: 1,
+      url: 'https://www.youtube.com/embed/mzJ4vCjSt28',
+      votedup: 0,
+      voteddown: 0,
+      voted: 0,
+      shared_at: '',
+      shared_by: 'mr.bichkhe@gmail.com',
+      title: 'We are number one csdsfsdfsdfsdfdsfsdf sfdsfsdfsdf',
+      description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industrys standard dummy text ever since the 1500s.It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.',
+    },
+    {
+      id: 2,
+      url: 'https://www.youtube.com/embed/09R8_2nJtjg?si=Uzt8W4HpkPPFWFsq',
+      votedup: 100,
+      voteddown: 10,
+      voted: 0,
+      shared_at: '',
+      shared_by: 'mr.bichkhe@gmail.com',
+      title: 'Sugar - Maroon 5',
+      description: 'Lorem Ipsum is',
+    },
+  ]
+  res.json(videos)
+  // res.send(req.cookies);
+})
 // app.post(`/post`, async (req, res) => {
 //   const { title, content, authorEmail } = req.body
 //   const result = await prisma.post.create({
