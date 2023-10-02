@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://youtubesharing:youtubesharing2023@45.119.83.244:6432/youtubesharing"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  verified     Boolean
+  createdAt    DateTime @default(now())
+  videos       Video[]
+}
+
+model AuthUser {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  sessionToken String
+  expiredAt    String
+  createdAt    DateTime @default(now())
+}
+
+model Video {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  linkUrl   String
+  updatedAt DateTime @updatedAt
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  viewCount Int      @default(0)
+  author    User?    @relation(fields: [authorId], references: [id])
+  authorId  Int?
+  votedUp   Int
+  votedDown Int
+  // voteup_users   User[]
+  // votedown_users User[]
+}
+
+model VideoStatus {
+  id      Int @id @default(autoincrement())
+  videoID Int
+  userID  Int
+}

@@ -1,0 +1,2 @@
+export const ERR_EMAIL_EXIST = 100
+export const ERR_PASSWORD_EMAIL_MISSMATCH = 101
