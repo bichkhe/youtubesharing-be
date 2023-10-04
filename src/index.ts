@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client'
+
 import express from 'express'
 import { comparePassword, generateToken, hashPassword, verifyToken } from './utils'
 import * as EmailValidator from 'email-validator'
@@ -6,12 +6,15 @@ import cookieParser from 'cookie-parser'
 import dayjs from 'dayjs'
 import * as dotenv from "dotenv"
 import cors from 'cors'
+import { prisma, VoteKind } from './prisma'
+import authMiddleware from './middlewars/auth'
+import { notEqual } from 'assert'
 
-const prisma = new PrismaClient()
 const app = express()
+app.use(express.json())
 app.use(cors())
 app.use(cookieParser())
-app.use(express.json())
+app.use(authMiddleware)
 
 
 dotenv.config();
@@ -117,154 +120,167 @@ app.post('/api/logout', (req, res) => {
 
 // -- Videos API
 app.get(`/api/videos`, async (req, res) => {
-  console.log(req.cookies);
-  const params = req.params
-  const videos = [
-    {
-      id: 1,
-      url: 'https://www.youtube.com/embed/mzJ4vCjSt28',
-      votedup: 0,
-      voteddown: 0,
-      voted: 0,
-      shared_at: '',
-      shared_by: 'mr.bichkhe@gmail.com',
-      title: 'We are number one csdsfsdfsdfsdfdsfsdf sfdsfsdfsdf',
-      description: 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industrys standard dummy text ever since the 1500s.It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.',
+  console.log('email:', res.locals.email)
+  const { page, pageSize } = req.query
+  const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 10
+  const pageQ = page as unknown as number >= 1 ? page : 1
+  const skip = ((pageQ as number - 1) * (pageSizeQ as number)) as number;
+  const email = res.locals.email
+  console.log(pageQ, pageSizeQ, skip)
+  let videos = await prisma.video.findMany({
+    skip: skip,
+    take: pageSizeQ,
+    where: {
+      published: true,
     },
-    {
-      id: 2,
-      url: 'https://www.youtube.com/embed/09R8_2nJtjg?si=Uzt8W4HpkPPFWFsq',
-      votedup: 100,
-      voteddown: 10,
-      voted: 0,
-      shared_at: '',
-      shared_by: 'mr.bichkhe@gmail.com',
-      title: 'Sugar - Maroon 5',
-      description: 'Lorem Ipsum is',
+    orderBy: {
+      updatedAt: 'desc',
     },
-  ]
+  })
+  console.log('videos:', videos)
+  if (!email) {
+
+  }
   res.json(videos)
-  // res.send(req.cookies);
 })
-// app.post(`/post`, async (req, res) => {
-//   const { title, content, authorEmail } = req.body
-//   const result = await prisma.post.create({
-//     data: {
-//       title,
-//       content,
-//       author: { connect: { email: authorEmail } },
-//     },
-//   })
-//   res.json(result)
-// })
 
-// app.put('/post/:id/views', async (req, res) => {
-//   const { id } = req.params
+app.post(`/api/videos/sharing`, async (req, res) => {
+  const { link, title, description } = req.body;
+  const createdAt = dayjs(new Date()).format('YYYY-MM-DDTHH:mm:ss.SSSZ')
+  console.log('email:', res.locals.email)
+  const user = await prisma.user.findFirst({
+    where: {
+      email: res.locals.email
+    }
+  })
 
-//   try {
-//     const post = await prisma.post.update({
-//       where: { id: Number(id) },
-//       data: {
-//         viewCount: {
-//           increment: 1,
-//         },
-//       },
-//     })
+  if (!user) {
+    return res.status(400).json({
+      code: -1111,
+      error_message: ""
+    })
+  }
 
-//     res.json(post)
-//   } catch (error) {
-//     res.json({ error: `Post with ID ${id} does not exist in the database` })
-//   }
-// })
+  let video = {
+    createdAt: createdAt,
+    linkUrl: link,
+    updatedAt: createdAt,
+    title: title,
+    content: description,
+    viewCount: 0,
+    authorId: user.id,
+    votedUp: 0,
+    votedDown: 0,
+    published: true,
+    email: user.email,
+  }
+  const videoCreated = await prisma.video.create({
+    data: video
+  })
+  console.log('videoCreated:', videoCreated, video)
+  res.json(videoCreated)
+})
+app.post(`/api/videos/vote`, async (req, res) => {
+  const { vote, id } = req.body;
+  console.log('email:', res.locals.email)
+  const user = await prisma.user.findFirst({
+    where: {
+      email: res.locals.email
+    }
+  })
 
-// app.put('/publish/:id', async (req, res) => {
-//   const { id } = req.params
+  const valid = ["UP", "DOWN"].includes(vote)
+  if (!valid) {
+    return res.status(400).json({
+      code: -1111,
+      error_message: "Bad request: vote field must be UP or DOWN"
+    })
+  }
 
-//   try {
-//     const postData = await prisma.post.findUnique({
-//       where: { id: Number(id) },
-//       select: {
-//         published: true,
-//       },
-//     })
+  if (!user) {
+    return res.status(400).json({
+      code: -1111,
+      error_message: ""
+    })
+  }
+  const videoFound = await prisma.video.findFirst({
+    where: {
+      id: id,
+    }
+  })
+  if (!videoFound) {
+    return res.status(400).json({
+      code: -1111,
+      error_message: "not found video"
+    })
+  }
+  let votedUp = videoFound?.votedUp as number
+  let votedDown = videoFound?.votedDown as number
+  if (videoFound != null) {
+    console.log('up:', votedUp, votedDown);
+    // if user has voted
+    const userVote = await prisma.videoStatus.findFirst({
+      where: {
+        videoID: id,
+        userID: user.id,
+        vote: { in: [VoteKind.UP, VoteKind.DOWN] }
+      }
+    })
 
-//     const updatedPost = await prisma.post.update({
-//       where: { id: Number(id) || undefined },
-//       data: { published: !postData?.published },
-//     })
-//     res.json(updatedPost)
-//   } catch (error) {
-//     res.json({ error: `Post with ID ${id} does not exist in the database` })
-//   }
-// })
+    if (!userVote) {
+      if (vote == VoteKind.UP) {
+        votedUp++
+        console.log('user not vote:', votedUp);
+      } else { //down
+        votedDown++
+      }
+    } else {
+      if (userVote.vote == VoteKind.UP && vote == VoteKind.UP) {
+        //nothing change
+      } if (userVote.vote == VoteKind.DOWN && vote == VoteKind.DOWN) {
+        //nothing change
+      } else if (userVote.vote == VoteKind.UP && vote == VoteKind.DOWN) {
+        votedUp--
+        votedDown++
+      } else if (userVote.vote == VoteKind.DOWN && vote == VoteKind.UP) {
+        votedUp++
+        votedDown--
+      }
+    }
 
-// app.delete(`/post/:id`, async (req, res) => {
-//   const { id } = req.params
-//   const post = await prisma.post.delete({
-//     where: {
-//       id: Number(id),
-//     },
-//   })
-//   res.json(post)
-// })
+    // TODO: Improvement: If voteUp or VoteDown does not change, we don not need to update to db
+    const videoUpdated = await prisma.video.update({
+      where: {
+        id: videoFound?.id,
+      },
+      data: {
+        votedUp: votedUp,
+        votedDown: votedDown,
+        updatedAt: dayjs(new Date()).format('YYYY-MM-DDTHH:mm:ss.SSSZ')
+      }
+    })
 
-// app.get('/users', async (req, res) => {
-//   const users = await prisma.user.findMany()
-//   res.json(users)
-// })
+    console.log('update video:', videoUpdated)
+    const voteUpsert = {
+      videoID: videoFound.id,
+      userID: user.id,
+      vote: vote,
+      email: user.email,
+    }
+    const videoStatusCreated = await prisma.videoStatus.upsert({
+      create: voteUpsert,
+      update: voteUpsert,
+      where: {
+        videoID_userID: {
+          videoID: id,
+          userID: user.id
+        }
+      }
+    })
 
-// app.get('/user/:id/drafts', async (req, res) => {
-//   const { id } = req.params
-
-//   const drafts = await prisma.user
-//     .findUnique({
-//       where: {
-//         id: Number(id),
-//       },
-//     })
-//     .posts({
-//       where: { published: false },
-//     })
-
-//   res.json(drafts)
-// })
-
-// app.get(`/post/:id`, async (req, res) => {
-//   const { id }: { id?: string } = req.params
-
-//   const post = await prisma.post.findUnique({
-//     where: { id: Number(id) },
-//   })
-//   res.json(post)
-// })
-
-// app.get('/feed', async (req, res) => {
-//   const { searchString, skip, take, orderBy } = req.query
-
-//   const or: Prisma.PostWhereInput = searchString
-//     ? {
-//       OR: [
-//         { title: { contains: searchString as string } },
-//         { content: { contains: searchString as string } },
-//       ],
-//     }
-//     : {}
-
-//   const posts = await prisma.post.findMany({
-//     where: {
-//       published: true,
-//       ...or,
-//     },
-//     include: { author: true },
-//     take: Number(take) || undefined,
-//     skip: Number(skip) || undefined,
-//     orderBy: {
-//       updatedAt: orderBy as Prisma.SortOrder,
-//     },
-//   })
-
-//   res.json(posts)
-// })
+    res.json(videoUpdated)
+  }
+})
 
 const server = app.listen(9800, () =>
   console.log(`

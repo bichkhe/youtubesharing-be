@@ -27,9 +27,13 @@ const generateToken = (email: string, expiresIn: string) => {
     );
     return token
 }
-
+export interface Claim {
+    email: string;
+    iat: number;
+    exp: number;
+}
 const verifyToken = (token: string) => {
-    const claim = jwt.verify(token, "dffdfdfdvdvcsdfdfsdfsdfsdfsdfdsfdsfdsfdsfdsfsd" as string, {}) as JwtPayload;
+    const claim = jwt.verify(token, "dffdfdfdvdvcsdfdfsdfsdfsdfsdfdsfdsfdsfdsfdsfsd" as string, {}) as Claim;
     return claim
 }
 

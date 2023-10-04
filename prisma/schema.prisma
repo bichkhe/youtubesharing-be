@@ -36,6 +36,7 @@ model Video {
   viewCount Int      @default(0)
   author    User?    @relation(fields: [authorId], references: [id])
   authorId  Int?
+  email     String
   votedUp   Int
   votedDown Int
   // voteup_users   User[]
@@ -43,7 +44,16 @@ model Video {
 }
 
 model VideoStatus {
-  id      Int @id @default(autoincrement())
   videoID Int
   userID  Int
+  vote    VoteKind @default(UP)
+  email   String
+
+  @@id([videoID, userID])
+}
+
+enum VoteKind {
+  UP
+  DOWN
+  NONE
 }
