@@ -41,7 +41,11 @@ app.post(`/api/register`, async (req, res) => {
     }
   })
   if (user) {
-    return res.status(409).send("user is already exist. Please login");
+    return res.status(409).send(
+      {
+        code: -101,
+        error_message: 'email is already exist. Please login',
+      });
   }
   // Step 3: 
   const password_hash = await hashPassword(password)
@@ -102,7 +106,8 @@ app.post(`/api/login`, async (req, res) => {
   res.json(result)
 })
 
-app.post('/api/logout', (req, res) => {
+app.post('/api/logout', async (req, res) => {
+  const email = res.locals.email
   const authHeader = req.headers['authorization']
   let token = ""
   if (authHeader?.startsWith("Bearer")) {
@@ -111,6 +116,11 @@ app.post('/api/logout', (req, res) => {
   console.log('jwt_token11:', token);
   const claim = verifyToken(token)
   console.log('jwt_token:', token, claim)
+  await prisma.authUser.delete({
+    where: {
+      email: email,
+    }
+  })
   res.clearCookie('token');
   res.json({
     code: 0,
@@ -120,7 +130,7 @@ app.post('/api/logout', (req, res) => {
 
 // -- Videos API
 app.get(`/api/videos`, async (req, res) => {
-  console.log('email:', res.locals.email)
+
   const { page, pageSize } = req.query
   const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 10
   const pageQ = page as unknown as number >= 1 ? page : 1
@@ -145,7 +155,7 @@ app.get(`/api/videos`, async (req, res) => {
 })
 
 app.post(`/api/videos/sharing`, async (req, res) => {
-  const { link, title, description } = req.body;
+  const { linkUrl, title, content } = req.body;
   const createdAt = dayjs(new Date()).format('YYYY-MM-DDTHH:mm:ss.SSSZ')
   console.log('email:', res.locals.email)
   const user = await prisma.user.findFirst({
@@ -163,10 +173,10 @@ app.post(`/api/videos/sharing`, async (req, res) => {
 
   let video = {
     createdAt: createdAt,
-    linkUrl: link,
+    linkUrl: linkUrl,
     updatedAt: createdAt,
     title: title,
-    content: description,
+    content: content,
     viewCount: 0,
     authorId: user.id,
     votedUp: 0,
