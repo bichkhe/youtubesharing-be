@@ -8,7 +8,8 @@ import * as dotenv from "dotenv"
 import cors from 'cors'
 import { prisma, VoteKind } from './prisma'
 import authMiddleware from './middlewars/auth'
-import { notEqual } from 'assert'
+import { Video, VideoStatus } from '@prisma/client'
+import { IVideo, VideoResponse } from './model'
 
 const app = express()
 app.use(express.json())
@@ -130,7 +131,6 @@ app.post('/api/logout', async (req, res) => {
 
 // -- Videos API
 app.get(`/api/videos`, async (req, res) => {
-
   const { page, pageSize } = req.query
   const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 10
   const pageQ = page as unknown as number >= 1 ? page : 1
@@ -147,9 +147,42 @@ app.get(`/api/videos`, async (req, res) => {
       updatedAt: 'desc',
     },
   })
-  console.log('videos:', videos)
-  if (!email) {
+  const user = await prisma.user.findFirst({
+    where: {
+      email: res.locals.email
+    }
+  })
+  if (!user) {
+    return res.status(400).json({
+      code: -1111,
+      error_message: ""
+    })
+  }
 
+  let videosIds: number[] = []
+  videos.forEach((item) => {
+    videosIds.push(item.id)
+  })
+  // console.log('videos:', videos)
+  if (!email) {
+    const videoStatusRecords = await prisma.videoStatus.findMany({
+      where: {
+        userID: user.id,
+        videoID: { in: videosIds }
+      }
+    })
+
+    let videosFinal: IVideo[] = videos
+    videosFinal.map((item: IVideo) => {
+      const idx = videoStatusRecords.find((it: VideoStatus) => it.videoID == item.id)
+      if (idx) {
+        item.voted = idx.vote
+      }
+    })
+    console.log('videosFinal:', videosFinal)
+    return res.json(
+      videosFinal
+    )
   }
   res.json(videos)
 })
@@ -193,11 +226,7 @@ app.post(`/api/videos/sharing`, async (req, res) => {
 app.post(`/api/videos/vote`, async (req, res) => {
   const { vote, id } = req.body;
   console.log('email:', res.locals.email)
-  const user = await prisma.user.findFirst({
-    where: {
-      email: res.locals.email
-    }
-  })
+
 
   const valid = ["UP", "DOWN"].includes(vote)
   if (!valid) {
@@ -206,7 +235,11 @@ app.post(`/api/videos/vote`, async (req, res) => {
       error_message: "Bad request: vote field must be UP or DOWN"
     })
   }
-
+  const user = await prisma.user.findFirst({
+    where: {
+      email: res.locals.email
+    }
+  })
   if (!user) {
     return res.status(400).json({
       code: -1111,
