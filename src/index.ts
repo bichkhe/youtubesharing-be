@@ -14,8 +14,8 @@ import * as fs from 'fs';
 import * as https from 'https';
 
 
-var privateKey = fs.readFileSync('rsaprivkey.pem');
-var certificate = fs.readFileSync('rsacert.pem');
+var privateKey = fs.readFileSync('selfsigned.key');
+var certificate = fs.readFileSync('selfsigned.crt');
 
 
 const app = express()
@@ -347,7 +347,7 @@ https.createServer({
   cert: certificate
 }, app).listen(9800);
 console.log(`
-🚀 Server ready at: http://0.0.0.0:9800`),
+🚀 Server ready at: http://0.0.0.0:9800`)
 // const server = app.listen(9800, () =>
 //   console.log(`
 // 🚀 Server ready at: http://192.168.0.10:9800`),
