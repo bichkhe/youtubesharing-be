@@ -133,7 +133,7 @@ app.post('/api/logout', async (req, res) => {
 app.get(`/api/videos`, async (req, res) => {
   console.log('email:', res.locals.email)
   const { page, pageSize } = req.query
-  const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 10
+  const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 3
   const pageQ = page as unknown as number >= 1 ? page : 1
   const skip = ((pageQ as number - 1) * (pageSizeQ as number)) as number;
   const email = res.locals.email
@@ -166,9 +166,13 @@ app.get(`/api/videos`, async (req, res) => {
   videos.forEach((item) => {
     videosIds.push(item.id)
   })
-
+  const total = await prisma.video.count()
+  const totalPage = Math.ceil(total / pageSizeQ) as number
   // console.log('videos:', videos)
-  if (!email) return res.json(videos)
+  if (!email) return res.json({
+    videos: videos,
+    totalPage: totalPage,
+  })
   if (email) {
     console.log('hrere');
     const videoStatusRecords = await prisma.videoStatus.findMany({
@@ -186,11 +190,12 @@ app.get(`/api/videos`, async (req, res) => {
       }
     })
     // console.log('videosFinal:', videosFinal)
-    return res.json(
-      videosFinal
+    return res.json({
+      videos: videosFinal,
+      totalPage: totalPage,
+    }
     )
   }
-
 })
 
 app.post(`/api/videos/sharing`, async (req, res) => {
@@ -232,7 +237,6 @@ app.post(`/api/videos/sharing`, async (req, res) => {
 app.post(`/api/videos/vote`, async (req, res) => {
   const { vote, id } = req.body;
   console.log('email:', res.locals.email)
-
 
   const valid = ["UP", "DOWN"].includes(vote)
   if (!valid) {
