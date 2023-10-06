@@ -131,22 +131,15 @@ app.post('/api/logout', async (req, res) => {
 
 // -- Videos API
 app.get(`/api/videos`, async (req, res) => {
+  console.log('email:', res.locals.email)
   const { page, pageSize } = req.query
   const pageSizeQ = parseInt(pageSize as string) > 0 ? parseInt(pageSize as string) : 10
   const pageQ = page as unknown as number >= 1 ? page : 1
   const skip = ((pageQ as number - 1) * (pageSizeQ as number)) as number;
   const email = res.locals.email
   console.log(pageQ, pageSizeQ, skip)
-  let videos = await prisma.video.findMany({
-    skip: skip,
-    take: pageSizeQ,
-    where: {
-      published: true,
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  })
+
+  // validate user is existed in our system
   const user = await prisma.user.findFirst({
     where: {
       email: res.locals.email
@@ -158,13 +151,26 @@ app.get(`/api/videos`, async (req, res) => {
       error_message: ""
     })
   }
-
+  // get all videos by pagination
+  let videos = await prisma.video.findMany({
+    skip: skip,
+    take: pageSizeQ,
+    where: {
+      published: true,
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  })
   let videosIds: number[] = []
   videos.forEach((item) => {
     videosIds.push(item.id)
   })
+
   // console.log('videos:', videos)
-  if (!email) {
+  if (!email) return res.json(videos)
+  if (email) {
+    console.log('hrere');
     const videoStatusRecords = await prisma.videoStatus.findMany({
       where: {
         userID: user.id,
@@ -179,12 +185,12 @@ app.get(`/api/videos`, async (req, res) => {
         item.voted = idx.vote
       }
     })
-    console.log('videosFinal:', videosFinal)
+    // console.log('videosFinal:', videosFinal)
     return res.json(
       videosFinal
     )
   }
-  res.json(videos)
+
 })
 
 app.post(`/api/videos/sharing`, async (req, res) => {
