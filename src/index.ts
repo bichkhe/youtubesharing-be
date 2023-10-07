@@ -14,8 +14,8 @@ import * as fs from 'fs';
 import * as https from 'https';
 
 
-var privateKey = fs.readFileSync('selfsigned.key');
-var certificate = fs.readFileSync('selfsigned.crt');
+// var privateKey = fs.readFileSync('selfsigned.key');
+// var certificate = fs.readFileSync('selfsigned.crt');
 
 const app = express()
 app.use(express.json())
