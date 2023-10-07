@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://youtubesharing:youtubesharing2023@45.119.83.244:6432/youtubesharing"
+  url      = env("DATABASE_URL")
 }
 
 model User {

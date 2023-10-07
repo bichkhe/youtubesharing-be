@@ -26,7 +26,7 @@ app.use(authMiddleware)
 
 
 dotenv.config();
-app.options('*', cors())
+// app.options('*', cors())
 // --- User
 app.post(`/api/register`, async (req, res) => {
   const { name, email, password } = req.body
@@ -342,13 +342,13 @@ app.post(`/api/videos/vote`, async (req, res) => {
   }
 })
 
-https.createServer({
-  key: privateKey,
-  cert: certificate
-}, app).listen(9800);
-console.log(`
-🚀 Server ready at: http://0.0.0.0:9800`)
-// const server = app.listen(9800, () =>
-//   console.log(`
-// 🚀 Server ready at: http://192.168.0.10:9800`),
-// )
+// https.createServer({
+//   key: privateKey,
+//   cert: certificate
+// }, app).listen(9800);
+// console.log(`
+// 🚀 Server ready at: http://0.0.0.0:9800`)
+const server = app.listen(9800, () =>
+  console.log(`
+🚀 Server ready at: http://192.168.0.10:9800`),
+)
