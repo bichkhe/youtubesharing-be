@@ -6,10 +6,10 @@
             "use": "@now/node"
         }
     ],
-    "rewires": [
+    "routes": [
         {
-            "source": "/api/(.*)",
-            "destination": "/api"
+            "src": "/(.*)",
+            "dest": "src/index.js"
         }
     ]
 }
