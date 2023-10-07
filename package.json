@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "ts-node src/index.ts",
-    "build": "tsc"
+    "build": "prisma generate && tsc"
   },
   "dependencies": {
     "@prisma/client": "5.3.1",
