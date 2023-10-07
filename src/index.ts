@@ -17,7 +17,6 @@ import * as https from 'https';
 var privateKey = fs.readFileSync('selfsigned.key');
 var certificate = fs.readFileSync('selfsigned.crt');
 
-
 const app = express()
 app.use(express.json())
 app.use(cors())
@@ -352,3 +351,5 @@ const server = app.listen(9800, () =>
   console.log(`
 🚀 Server ready at: http://192.168.0.10:9800`),
 )
+
+export default app;
