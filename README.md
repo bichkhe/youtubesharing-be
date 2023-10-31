@@ -6,6 +6,7 @@
 Grant permissions for `account` on postgres
 
 ```sql
+CREATE USER youtubesharing WITH PASSWORD 'xxxxxxxx';
 ALTER USER `youtubesharing` CREATEDB;
 GRANT ALL ON schema public TO `youtubesharing`; 
 ```
